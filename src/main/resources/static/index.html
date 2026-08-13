@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Items API — Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const API = '/api/items';
+
+    function Toast({ msg, type }) {
+      if (!msg) return null;
+      const bg = type === 'error' ? 'bg-red-500' : 'bg-emerald-500';
+      return (
+        <div className={`fixed top-5 right-5 z-50 ${bg} text-white text-sm px-4 py-2.5 rounded-lg shadow-lg`}>
+          {msg}
+        </div>
+      );
+    }
+
+    function Badge({ label }) {
+      return (
+        <span className="inline-block bg-blue-100 text-blue-700 text-xs font-mono px-2 py-0.5 rounded">
+          {label}
+        </span>
+      );
+    }
+
+    function App() {
+      const [items, setItems]       = useState([]);
+      const [loading, setLoading]   = useState(true);
+      const [toast, setToast]       = useState({ msg: '', type: '' });
+      const [form, setForm]         = useState({ name: '', description: '' });
+      const [editingId, setEditingId] = useState(null);
+      const [lookupId, setLookupId] = useState('');
+      const [lookedUp, setLookedUp] = useState(null);
+      const [lookupErr, setLookupErr] = useState('');
+
+      const notify = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast({ msg: '', type: '' }), 3000);
+      };
+
+      const fetchAll = async () => {
+        setLoading(true);
+        try {
+          const res = await fetch(API);
+          if (!res.ok) throw new Error();
+          setItems(await res.json());
+        } catch {
+          notify('Failed to load items', 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      useEffect(() => { fetchAll(); }, []);
+
+      const resetForm = () => { setForm({ name: '', description: '' }); setEditingId(null); };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        const method = editingId ? 'PUT' : 'POST';
+        const url    = editingId ? `${API}/${editingId}` : API;
+        try {
+          const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form),
+          });
+          if (!res.ok) throw new Error();
+          notify(editingId ? 'Item updated successfully' : 'Item created successfully');
+          resetForm();
+          fetchAll();
+        } catch {
+          notify('Operation failed', 'error');
+        }
+      };
+
+      const startEdit = (item) => {
+        setEditingId(item.id);
+        setForm({ name: item.name, description: item.description ?? '' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const handleDelete = async (id) => {
+        if (!confirm(`Delete item #${id}? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error();
+          notify('Item deleted');
+          fetchAll();
+          if (lookedUp?.id === id) setLookedUp(null);
+        } catch {
+          notify('Delete failed', 'error');
+        }
+      };
+
+      const handleLookup = async () => {
+        setLookedUp(null);
+        setLookupErr('');
+        if (!lookupId) return;
+        try {
+          const res = await fetch(`${API}/${lookupId}`);
+          if (res.status === 404) { setLookupErr(`No item found with ID ${lookupId}`); return; }
+          if (!res.ok) throw new Error();
+          setLookedUp(await res.json());
+        } catch {
+          setLookupErr('Request failed');
+        }
+      };
+
+      const fmt = (ts) => ts ? new Date(ts).toLocaleString() : '—';
+
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <Toast msg={toast.msg} type={toast.type} />
+
+          {/* Header */}
+          <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+            <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">Items API</h1>
+                <p className="text-xs text-gray-400 mt-0.5">Spring Boot + Supabase — Live Tester</p>
+              </div>
+              <div className="flex gap-2 text-xs text-gray-500">
+                <Badge label="GET /api/items" />
+                <Badge label="POST" />
+                <Badge label="PUT /:id" />
+                <Badge label="DELETE /:id" />
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+            {/* Top row */}
+            <div className="grid md:grid-cols-2 gap-5">
+
+              {/* Add / Edit */}
+              <section className="bg-white rounded-xl border border-gray-200 p-5">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">
+                  {editingId ? `✏️  Editing Item #${editingId}` : '➕  Add New Item'}
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Name <span className="text-red-400">*</span></label>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                      placeholder="e.g. Laptop"
+                      value={form.name}
+                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Description</label>
+                    <textarea
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition resize-none"
+                      placeholder="Optional description…"
+                      rows={3}
+                      value={form.description}
+                      onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button type="submit"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition">
+                      {editingId ? 'Save Changes' : 'Create Item'}
+                    </button>
+                    {editingId && (
+                      <button type="button" onClick={resetForm}
+                        className="px-4 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </section>
+
+              {/* Get by ID */}
+              <section className="bg-white rounded-xl border border-gray-200 p-5">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">🔍  Get Item by ID</h2>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="number"
+                    min="1"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                    placeholder="Enter item ID"
+                    value={lookupId}
+                    onChange={e => setLookupId(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleLookup()}
+                  />
+                  <button onClick={handleLookup}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 rounded-lg transition">
+                    Fetch
+                  </button>
+                </div>
+
+                {lookupErr && (
+                  <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{lookupErr}</p>
+                )}
+
+                {lookedUp && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm space-y-2">
+                    <div className="flex justify-between items-start">
+                      <span className="font-semibold text-gray-800 text-base">{lookedUp.name}</span>
+                      <span className="text-xs text-gray-400 font-mono">#{lookedUp.id}</span>
+                    </div>
+                    <p className="text-gray-500">{lookedUp.description || <em className="text-gray-300">No description</em>}</p>
+                    <p className="text-xs text-gray-400">Created: {fmt(lookedUp.createdAt)}</p>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={() => startEdit(lookedUp)}
+                        className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-md transition">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(lookedUp.id)}
+                        className="text-xs bg-red-50 text-red-500 hover:bg-red-100 px-3 py-1 rounded-md transition">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </div>
+
+            {/* All Items */}
+            <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+                  📋  All Items
+                  {!loading && (
+                    <span className="ml-2 bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full font-normal normal-case">
+                      {items.length}
+                    </span>
+                  )}
+                </h2>
+                <button onClick={fetchAll}
+                  className="text-xs text-blue-500 hover:text-blue-700 transition font-medium">
+                  ↻ Refresh
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-16 text-gray-300 text-sm">Loading…</div>
+              ) : items.length === 0 ? (
+                <div className="text-center py-16 text-gray-400 text-sm">No items yet. Create one above.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wide">
+                      <tr>
+                        <th className="px-5 py-3 text-left w-12">ID</th>
+                        <th className="px-5 py-3 text-left">Name</th>
+                        <th className="px-5 py-3 text-left">Description</th>
+                        <th className="px-5 py-3 text-left w-44">Created At</th>
+                        <th className="px-5 py-3 text-right w-28">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {items.map(item => (
+                        <tr key={item.id}
+                          className={`hover:bg-gray-50 transition ${editingId === item.id ? 'bg-blue-50' : ''}`}>
+                          <td className="px-5 py-3.5 text-gray-400 font-mono text-xs">{item.id}</td>
+                          <td className="px-5 py-3.5 font-medium text-gray-800">{item.name}</td>
+                          <td className="px-5 py-3.5 text-gray-500 max-w-xs truncate">{item.description || <span className="text-gray-300">—</span>}</td>
+                          <td className="px-5 py-3.5 text-gray-400 text-xs">{fmt(item.createdAt)}</td>
+                          <td className="px-5 py-3.5 text-right space-x-3">
+                            <button onClick={() => startEdit(item)}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium transition">
+                              Edit
+                            </button>
+                            <button onClick={() => handleDelete(item.id)}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium transition">
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+          </main>
+
+          <footer className="text-center text-xs text-gray-300 py-8">
+            Spring Boot · Supabase · PostgreSQL · Flyway · React
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
