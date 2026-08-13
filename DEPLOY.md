@@ -1,5 +1,7 @@
 # Render Deployment Guide
 
+- URL: [Live - https://springboot-demo-dreamwin.onrender.com](https://springboot-demo-dreamwin.onrender.com)
+
 ## Prerequisites
 - Code pushed to GitHub (`munirajan24/springboot-demo`)
 - [Render](https://render.com) account connected to your GitHub
@@ -37,14 +39,25 @@ Add these **3 variables** in the Environment Variables section before deploying:
 
 | Name | Value |
 |---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://db.cdbwldjqqwjezlizlptm.supabase.co:5432/postgres?sslmode=require` |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres.cdbwldjqqwjezlizlptm` |
 | `SPRING_DATASOURCE_PASSWORD` | `YourShop@2026!` |
 
 > **Note:** Do not embed the username/password inside the URL — keep them in separate vars.
-
+----------------------------------------
+Latest values from Supabase dashboard (Database → Session Connection Pooling) are:
+1. host=aws-0-ap-northeast-2.pooler.supabase.com
+2. port=5432
+3. database=postgres
+4. user=postgres.cdbwldjqqwjezlizlptm
 ---
 
+old
+1. host=db.cdbwldjqqwjezlizlptm.supabase.co
+2. port=5432
+3. database=postgres
+4. user=postgres
+---
 ## Step 4 — Deploy
 
 Click **Deploy Web Service**.
